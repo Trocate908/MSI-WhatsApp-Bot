@@ -1,25 +1,17 @@
 {
   "name": "msi-xmd-bot",
-  "version": "2.0.0",
-  "description": "MSI XMD WhatsApp Bot with Pairing Code",
+  "version": "2.1.0",
+  "description": "MSI XMD WhatsApp Bot with Phone Number Pairing",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "pair": "node src/pair.js"
+    "pair:local": "WHATSAPP_NUMBER=+263715907468 node server.js",
+    "test": "echo \"No tests specified\""
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "baileys",
-    "msi-xmd",
-    "render"
-  ],
-  "author": "MSI Team",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
     "dotenv": "^16.3.1",
