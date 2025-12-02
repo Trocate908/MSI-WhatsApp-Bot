@@ -1,5 +1,5 @@
     pair: {
-        description: 'Get pairing information',
+        description: 'Get pairing information and status',
         usage: '.pair',
         execute: async (args, message, sock, isGroup, user, prefix) => {
             const sender = message.key.remoteJid;
@@ -7,21 +7,20 @@
             const pairText = 
 `📱 *PAIRING INFORMATION*
 
-To pair your WhatsApp:
-1. Open WhatsApp → Settings → Linked Devices
-2. Tap "Link a Device"
-3. Select "Link with phone number"
-4. Enter your phone number with country code
-5. Enter the pairing code shown in logs
+*Current Status:* ${sock.user ? 'Connected ✅' : 'Not Connected ❌'}
 
-🔧 *Current Status:*
-• Bot is using pairing code system
-• Session is ${sock.user ? 'connected ✅' : 'disconnected ❌'}
-• Prefix: ${prefix}
+*Pairing Method:* Phone Number + Code
+*Prefix:* ${prefix}
 
-💡 *Note:* Pairing code is generated in console/logs
-⚠️ *Warning:* Never share your pairing code!`;
-            
+*To Re-pair:*
+1. Delete auth_info folder on server
+2. Set WHATSAPP_NUMBER in environment
+3. Restart bot
+4. Check logs for new pairing code
+
+*Note:* Pairing code is shown in server logs only
+Never share your pairing code!`;
+
             await sock.sendMessage(sender, { text: pairText });
         }
     },
