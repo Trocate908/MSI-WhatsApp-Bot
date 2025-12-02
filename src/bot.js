@@ -30,14 +30,20 @@ class MSIXMDBot {
                 logger: pino({ level: 'silent' }),
                 auth: state,
 
-                // REQUIRED for pairing to work reliably
-                browser: ['MSI XMD', 'Chrome', '122.0']
+                // REQUIRED for phone-number pairing mode
+                mobile: true,
+
+                // More stable browser identity
+                browser: ['MSI XMD', 'Chrome', '122.0'],
+
+                // Prevent heavy syncing during pairing
+                syncFullHistory: false
             });
 
-            // Save creds on update
+            // Save credentials if updated
             this.sock.ev.on('creds.update', saveCreds);
 
-            // Connection status handling
+            // Connection handler
             this.sock.ev.on('connection.update', (update) => {
                 const { connection, lastDisconnect } = update;
 
@@ -50,22 +56,22 @@ class MSIXMDBot {
                     const reason = lastDisconnect?.error?.output?.statusCode;
 
                     if (reason === DisconnectReason.loggedOut) {
-                        console.log('❌ Session logged out. Clearing auth & requesting new code.');
+                        console.log('❌ Logged out by WhatsApp. Waiting 15 seconds before retry...');
                         this.cleanupAuth();
-                        setTimeout(() => this.init(), 5000);
+                        setTimeout(() => this.init(), 15000);
                     } else {
-                        console.log('🔄 Disconnected. Reconnecting...');
-                        setTimeout(() => this.init(), 5000);
+                        console.log('🔄 Disconnected. Reconnecting in 8 seconds...');
+                        setTimeout(() => this.init(), 8000);
                     }
                 }
             });
 
-            // Only generate pairing code if there is no session
+            // Generate pairing code only if session is empty
             if (this.phoneNumber && !state.creds.me) {
                 await this.generatePairingCode();
             }
 
-            // Message listener
+            // Message handler
             this.sock.ev.on('messages.upsert', (m) => {
                 const msg = m.messages[0];
                 if (!msg.message || msg.key.fromMe) return;
@@ -76,19 +82,23 @@ class MSIXMDBot {
                 }
             });
 
-            // Keep bot alive
+            // Keep the bot alive with presence
             this.setupKeepAlive();
 
         } catch (error) {
             console.error('❌ Initialization error:', error.message);
-            setTimeout(() => this.init(), 5000);
+            setTimeout(() => this.init(), 8000);
         }
     }
 
     async generatePairingCode() {
         try {
             console.log('\n🔢 Generating pairing code...');
+
             const code = await this.sock.requestPairingCode(this.phoneNumber);
+
+            // Delay is required for WhatsApp pairing stability
+            await new Promise(r => setTimeout(r, 3000));
 
             console.log('\n==============================================');
             console.log('✅ PAIRING CODE GENERATED');
@@ -162,17 +172,17 @@ class MSIXMDBot {
 // Start bot
 const bot = new MSIXMDBot();
 
-// Handle process exit
+// Graceful exit
 process.on('SIGINT', () => {
     console.log('\n🛑 Shutting down MSI XMD bot...');
     process.exit(0);
 });
 
-// Keep alive every 5 minutes
+// Keep logs active
 setInterval(() => {
     if (bot.sock && bot.sock.user) {
         console.log('💚 Bot is alive:', new Date().toLocaleTimeString());
     }
 }, 300000);
 
-module.exports = { MSIXMDBot }; 
+module.exports = { MSIXMDBot };
