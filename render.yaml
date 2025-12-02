@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: msi-xmd-bot
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_PREFIX
+        value: "."
+    disk:
+      name: auth-storage
+      mountPath: /opt/render/project/src/auth_info
