@@ -1,40 +1,50 @@
-// server.js - For Render deployment with pairing support
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Basic health check endpoint
+// Health check endpoint
 app.get('/', (req, res) => {
     res.json({
         status: 'online',
         bot: 'MSI XMD',
         version: '2.0.0',
-        platform: 'WhatsApp',
         pairing: 'Phone Number + Code',
         prefix: '.',
-        message: 'Bot is running on Render - Use pairing code to connect'
+        instruction: 'Set WHATSAPP_NUMBER in environment variables'
     });
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).send('OK');
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Pairing info endpoint
 app.get('/pair', (req, res) => {
+    const phoneSet = !!process.env.WHATSAPP_NUMBER;
     res.json({
-        instructions: 'Check Render logs for pairing code',
-        steps: [
-            '1. Open WhatsApp → Settings → Linked Devices',
-            '2. Tap "Link a Device"',
-            '3. Select "Link with phone number"',
-            '4. Enter phone number with country code',
-            '5. Enter pairing code from logs'
+        pairing_ready: phoneSet,
+        instruction: phoneSet ? 
+            'Check logs for pairing code' : 
+            'Set WHATSAPP_NUMBER environment variable',
+        format: '+[country code][phone number]',
+        example: '+1234567890'
+    });
+});
+
+// Start server
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Server started on port ${port}`);
+    console.log(`📡 Health: http://0.0.0.0:${port}/health`);
+    console.log(`🤖 Pair info: http://0.0.0.0:${port}/pair`);
+    
+    // Start bot
+    setTimeout(() => {
+        console.log('🤖 Starting WhatsApp bot...');
+        console.log('💡 Make sure WHATSAPP_NUMBER is set in environment');
+        require('./src/bot.js');
+    }, 1000);
+});
+
+module.exports = app;            '5. Enter pairing code from logs'
         ]
     });
 });
