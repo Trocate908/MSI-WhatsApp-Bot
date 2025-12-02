@@ -1,60 +1,41 @@
-// server.js - Fixed syntax with pairing code
+// server.js
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Health check endpoint
 app.get('/', (req, res) => {
     res.json({
         status: 'online',
         bot: 'MSI XMD',
         version: '2.1.0',
         pairing: 'Phone Number + Code',
-        prefix: '.',
-        instruction: 'Set WHATSAPP_NUMBER in environment variables'
+        instruction: 'Pairing code appears in logs'
     });
 });
 
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString() 
-    });
+    res.send('OK');
 });
 
-app.get('/pair', (req, res) => {
-    const phoneSet = !!process.env.WHATSAPP_NUMBER;
+app.get('/debug', (req, res) => {
     res.json({
-        pairing_ready: phoneSet,
-        instruction: phoneSet ? 
-            'Check logs for pairing code' : 
-            'Set WHATSAPP_NUMBER environment variable',
-        format: '+[country code][phone number]',
-        example: '+263715907468'
+        whatsapp_number_set: !!process.env.WHATSAPP_NUMBER,
+        node_version: process.version,
+        uptime: process.uptime()
     });
 });
 
-// Start server
-const server = app.listen(port, '0.0.0.0', () => {
+// Start with longer delay
+app.listen(port, () => {
     console.log(`🚀 Server started on port ${port}`);
-    console.log(`📡 Health: http://0.0.0.0:${port}/health`);
-    console.log(`🤖 Pair info: http://0.0.0.0:${port}/pair`);
+    console.log('⏳ Waiting 5 seconds before starting bot...');
     
-    // Start bot
     setTimeout(() => {
         console.log('🤖 Starting WhatsApp bot...');
-        console.log('💡 Make sure WHATSAPP_NUMBER is set in environment');
-        require('./src/bot.js');
-    }, 1000);
+        try {
+            require('./src/bot.js');
+        } catch (error) {
+            console.error('Failed to start bot:', error.message);
+        }
+    }, 5000);
 });
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
-
-module.exports = app;
