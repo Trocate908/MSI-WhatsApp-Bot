@@ -1,4 +1,3 @@
-// src/bot.js - Unified & Fixed
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
@@ -33,6 +32,7 @@ class MSIXMDBot {
 
             this.sock.ev.on('creds.update', saveCreds);
 
+            // ---- PATCHED CONNECTION HANDLER ----
             this.sock.ev.on('connection.update', (update) => {
                 const { connection, lastDisconnect } = update;
                 if (connection === 'open') {
@@ -40,12 +40,14 @@ class MSIXMDBot {
                     console.log('⚡ MSI XMD Bot is now online!');
                 }
                 if (connection === 'close') {
-                    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                    if (shouldReconnect) {
-                        setTimeout(() => this.init(), 5000);
-                    } else {
+                    const reason = lastDisconnect?.error?.output?.statusCode;
+                    // Only clean session if fully logged out!
+                    if (reason === DisconnectReason.loggedOut) {
                         console.log('❌ Logged out. Please re-pair your WhatsApp.');
                         this.cleanupAuth();
+                        setTimeout(() => this.init(), 5000);
+                    } else {
+                        console.log('🔄 Disconnected: Reason', reason, '| No session wipe. Retrying...');
                         setTimeout(() => this.init(), 5000);
                     }
                 }
