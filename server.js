@@ -7,7 +7,7 @@ app.get('/', (req, res) => {
     res.json({
         status: 'online',
         bot: 'MSI XMD',
-        version: '2.0.0',
+        version: '2.1.0',
         pairing: 'Phone Number + Code',
         prefix: '.',
         instruction: 'Set WHATSAPP_NUMBER in environment variables'
@@ -15,7 +15,10 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    res.status(200).json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString() 
+    });
 });
 
 app.get('/pair', (req, res) => {
@@ -35,6 +38,17 @@ app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Server started on port ${port}`);
     console.log(`📡 Health: http://0.0.0.0:${port}/health`);
     console.log(`🤖 Pair info: http://0.0.0.0:${port}/pair`);
+    
+    // Start bot
+    setTimeout(() => {
+        console.log('🤖 Starting WhatsApp bot...');
+        console.log('💡 Make sure WHATSAPP_NUMBER is set in environment');
+        require('./src/bot.js');
+    }, 1000);
+});
+
+// Export for testing
+module.exports = app;    console.log(`🤖 Pair info: http://0.0.0.0:${port}/pair`);
     
     // Start bot
     setTimeout(() => {
