@@ -35,7 +35,7 @@ app.get('/pair', (req, res) => {
 });
 
 // Start server
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Server started on port ${port}`);
     console.log(`📡 Health: http://0.0.0.0:${port}/health`);
     console.log(`🤖 Pair info: http://0.0.0.0:${port}/pair`);
@@ -44,22 +44,6 @@ app.listen(port, '0.0.0.0', () => {
     setTimeout(() => {
         console.log('🤖 Starting WhatsApp bot...');
         console.log('💡 Make sure WHATSAPP_NUMBER is set in environment');
-        require('./src/bot.js');
-    }, 1000);
-});
-
-module.exports = app;        
-    });
-});
-
-// Start Express server
-const server = app.listen(port, () => {
-    console.log(`🌐 Web server running on port ${port}`);
-    console.log(`📡 Health check: http://localhost:${port}/health`);
-    console.log(`📱 Pairing info: http://localhost:${port}/pair`);
-    
-    // Import and start the bot
-    setTimeout(() => {
         require('./src/bot.js');
     }, 1000);
 });
