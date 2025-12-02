@@ -45,7 +45,7 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 module.exports = app;            '5. Enter pairing code from logs'
-        ]
+        
     });
 });
 
