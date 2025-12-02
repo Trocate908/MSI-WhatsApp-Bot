@@ -1,220 +1,99 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const pino = require('pino');
+// src/bot.js - SIMPLE FIXED VERSION
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 
-class MSIXMDBot {
-    constructor() {
-        this.sock = null;
-        this.authFolder = './auth_info';
-        this.prefix = '.';
-        this.phoneNumber = process.env.WHATSAPP_NUMBER;
-        this.isGeneratingCode = false;
-        this.init();
+async function startBot() {
+    console.log('🤖 MSI XMD Bot starting...');
+    
+    const phone = process.env.WHATSAPP_NUMBER;
+    if (!phone) {
+        console.log('❌ Set WHATSAPP_NUMBER environment variable');
+        console.log('👉 Format: +263715907468');
+        return;
     }
-
-    async init() {
-        try {
-            if (!this.phoneNumber) {
-                console.log('❌ WHATSAPP_NUMBER environment variable not set');
-                console.log('👉 Set it in Render environment variables');
-                console.log('👉 Format: +1234567890');
-                return;
-            }
-
-            console.log(`📱 Phone number set: ${this.phoneNumber}`);
+    
+    console.log(`📱 Phone: ${phone}`);
+    
+    // Create auth folder
+    const authFolder = './auth_info';
+    if (!fs.existsSync(authFolder)) {
+        fs.mkdirSync(authFolder, { recursive: true });
+    }
+    
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+        });
+        
+        sock.ev.on('creds.update', saveCreds);
+        
+        // Connection handler - SIMPLE
+        sock.ev.on('connection.update', async (update) => {
+            console.log(`Connection: ${update.connection}`);
             
-            // Ensure auth folder exists
-            if (!fs.existsSync(this.authFolder)) {
-                fs.mkdirSync(this.authFolder, { recursive: true });
-                console.log('📁 Created auth folder');
-            }
-
-            const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
-            const { version } = await fetchLatestBaileysVersion();
-
-            this.sock = makeWASocket({
-                version,
-                logger: pino({ level: 'silent' }),
-                auth: state,
-                printQRInTerminal: false,
-            });
-
-            this.sock.ev.on('creds.update', saveCreds);
-
-            // Connection handler - FIXED
-            this.sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect } = update;
+            if (update.connection === 'open') {
+                console.log('✅ WhatsApp CONNECTED!');
+                console.log('⏳ Waiting 5 seconds for stable connection...');
                 
-                if (connection === 'open') {
-                    console.log('✅ WhatsApp connected successfully!');
-                    console.log('⚡ MSI XMD Bot is now online!');
-                    
-                    // Only generate code if we don't have credentials
-                    if (!state.creds.me && !this.isGeneratingCode) {
-                        this.isGeneratingCode = true;
-                        setTimeout(() => {
-                            this.generatePairingCode();
-                        }, 3000); // Wait 3 seconds after connection
+                // WAIT for connection to stabilize
+                setTimeout(async () => {
+                    try {
+                        console.log('🔢 Now requesting pairing code...');
+                        const code = await sock.requestPairingCode(phone);
+                        showPairingCode(code);
+                    } catch (error) {
+                        console.error('❌ Pairing failed:', error.message);
+                        console.log('🔄 Will retry in 15 seconds...');
+                        setTimeout(() => getPairingCodeWithRetry(sock, phone), 15000);
                     }
-                }
-
-                if (connection === 'close') {
-                    const reason = lastDisconnect?.error?.output?.statusCode;
-                    console.log(`🔌 Connection closed. Reason: ${reason}`);
-                    
-                    // Don't clean session unless explicitly logged out
-                    if (reason === DisconnectReason.loggedOut) {
-                        console.log('❌ Logged out. Session cleared.');
-                        this.cleanupAuth();
-                    }
-                    
-                    // Reconnect after delay
-                    setTimeout(() => {
-                        console.log('🔄 Reconnecting...');
-                        this.init();
-                    }, 5000);
-                }
-            });
-
-            // Handle messages
-            this.sock.ev.on('messages.upsert', (m) => {
-                const msg = m.messages[0];
-                if (!msg.message || msg.key.fromMe) return;
-                const text = msg.message.conversation || '';
-                if (text.startsWith('.')) {
-                    this.handleCommand(text, msg);
-                }
-            });
-
-            // Keep-alive presence
-            this.setupKeepAlive();
-
-        } catch (error) {
-            console.error('❌ Bot initialization error:', error.message);
-            setTimeout(() => this.init(), 10000); // Longer delay on error
-        }
-    }
-
-    async generatePairingCode() {
-        try {
-            console.log('\n🔢 Requesting pairing code...');
-            const code = await this.sock.requestPairingCode(this.phoneNumber);
-            
-            console.log('\n' + '='.repeat(60));
-            console.log('✅ PAIRING CODE GENERATED!');
-            console.log('='.repeat(60));
-            console.log('\n📱 ON YOUR PHONE:');
-            console.log('1. Open WhatsApp → Settings → Linked Devices');
-            console.log('2. Tap "Link a Device"');
-            console.log('3. Select "Link with phone number"');
-            console.log('4. Enter this 6-digit code:');
-            console.log('\n' + '🔢 '.repeat(6));
-            console.log('      ' + this.formatPairingCode(code));
-            console.log('🔢 '.repeat(6));
-            console.log('\n5. Wait for confirmation...');
-            console.log('💡 Code will expire in a few minutes');
-            console.log('='.repeat(60));
-            
-        } catch (error) {
-            console.error('❌ Pairing error:', error.message);
-            this.isGeneratingCode = false;
-            
-            // If connection error, try QR as fallback
-            if (error.message.includes('Connection Closed') || error.message.includes('timeout')) {
-                console.log('\n🔄 Falling back to QR code...');
-                this.fallbackToQR();
+                }, 5000); // Wait 5 seconds after connection
             }
-        }
-    }
-
-    async fallbackToQR() {
-        try {
-            // Force QR code generation
-            const qrcode = require('qrcode-terminal');
             
-            // Create new socket with QR enabled
-            const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
-            const { version } = await fetchLatestBaileysVersion();
-            
-            const qrSock = makeWASocket({
-                version,
-                logger: pino({ level: 'silent' }),
-                auth: state,
-                printQRInTerminal: true,
-            });
-
-            qrSock.ev.on('creds.update', saveCreds);
-            
-            qrSock.ev.on('connection.update', (update) => {
-                if (update.qr) {
-                    console.log('\n📱 QR CODE FALLBACK:');
-                    console.log('Scan this QR code instead:');
-                    qrcode.generate(update.qr, { small: true });
-                }
-                if (update.connection === 'open') {
-                    console.log('✅ Connected via QR!');
-                    this.sock = qrSock; // Replace socket
-                }
-            });
-            
-        } catch (error) {
-            console.error('QR fallback error:', error.message);
-        }
-    }
-
-    formatPairingCode(code) {
-        if (code && code.length === 6) {
-            return code.substring(0, 3) + ' ' + code.substring(3);
-        }
-        return code;
-    }
-
-    handleCommand(text, msg) {
-        const commands = {
-            '.ping': '🏓 Pong!',
-            '.help': '📋 Commands: .ping .help .info .status .pair',
-            '.info': '🤖 MSI XMD Bot v2.1.0 - Pairing Code System',
-            '.status': '✅ Bot is online and connected',
-            '.pair': `📱 Pairing: ${this.phoneNumber ? 'Phone number set' : 'Not configured'}`,
-        };
-        const response = commands[text] || '❌ Unknown command. Type .help for commands';
-        this.sock.sendMessage(msg.key.remoteJid, { text: response });
-    }
-
-    cleanupAuth() {
-        try {
-            if (fs.existsSync(this.authFolder)) {
-                const files = fs.readdirSync(this.authFolder);
-                if (files.length > 0) {
-                    fs.rmSync(this.authFolder, { recursive: true, force: true });
-                    fs.mkdirSync(this.authFolder, { recursive: true });
-                    console.log('🧹 Cleared old session data');
-                }
+            if (update.connection === 'close') {
+                console.log('🔌 Connection closed. Reconnecting in 10s...');
+                setTimeout(startBot, 10000);
             }
-        } catch (error) {
-            console.error('Error cleaning auth:', error);
-        }
-    }
-
-    setupKeepAlive() {
-        setInterval(async () => {
-            if (this.sock && this.sock.user) {
-                try {
-                    await this.sock.sendPresenceUpdate('available');
-                    console.log('💚 Heartbeat:', new Date().toLocaleTimeString());
-                } catch (error) {
-                    console.error('Heartbeat error:', error.message);
-                }
-            }
-        }, 300000); // 5 minutes
+        });
+        
+    } catch (error) {
+        console.error('❌ Startup error:', error.message);
+        setTimeout(startBot, 10000);
     }
 }
 
-// Start the bot
-const bot = new MSIXMDBot();
+// Helper to show pairing code
+function showPairingCode(code) {
+    console.log('\n' + '='.repeat(60));
+    console.log('🎉 PAIRING CODE SUCCESS!');
+    console.log('='.repeat(60));
+    console.log('\n🔢 CODE:', code);
+    console.log('\n📱 ON YOUR PHONE:');
+    console.log('1. Open WhatsApp');
+    console.log('2. Settings → Linked Devices → Link a Device');
+    console.log('3. Select "Link with phone number"');
+    console.log('4. Enter this code:', code);
+    console.log('\n⏰ Code expires in a few minutes');
+    console.log('='.repeat(60));
+}
 
-// Handle termination
-process.on('SIGINT', () => {
-    console.log('\n🛑 Shutting down...');
-    process.exit(0);
-}); 
+// Retry logic for pairing code
+async function getPairingCodeWithRetry(sock, phone, attempt = 1) {
+    if (attempt > 3) {
+        console.log('❌ Max retries reached. Try QR code instead.');
+        return;
+    }
+    
+    try {
+        console.log(`🔢 Retry ${attempt}/3: Requesting pairing code...`);
+        const code = await sock.requestPairingCode(phone);
+        showPairingCode(code);
+    } catch (error) {
+        console.error(`❌ Retry ${attempt} failed:`, error.message);
+        setTimeout(() => getPairingCodeWithRetry(sock, phone, attempt + 1), 10000);
+    }
+}
+
+// Start bot
+startBot(); 
